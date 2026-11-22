@@ -1,0 +1,25 @@
+[Unit]
+Description=Lead Outreach CRM (Example Co)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as a dedicated user. Create it first, or change User= to the
+# account that should own the app and its database:
+#   sudo useradd -r -s /usr/sbin/nologin leadcrm
+User=leadcrm
+Group=leadcrm
+WorkingDirectory=/opt/lead-crm
+EnvironmentFile=/opt/lead-crm/.env
+ExecStart=/usr/bin/python3 /opt/lead-crm/crm.py
+Restart=always
+RestartSec=5
+# The app only needs to write its own directory (database + backups).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/lead-crm
+
+[Install]
+WantedBy=multi-user.target

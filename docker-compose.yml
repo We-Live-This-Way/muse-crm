@@ -1,0 +1,20 @@
+# Alternative to the systemd service: run the CRM as a container.
+# The database lives in a named volume so it survives container
+# rebuilds. ADMIN_PASSWORD must be set (in .env next to this file).
+services:
+  crm:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      CRM_DB: "/data/crm.db"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - crm-data:/data
+
+volumes:
+  crm-data:

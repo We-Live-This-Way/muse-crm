@@ -1,0 +1,11 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+*.bak*
+backups/
+keys/
+__pycache__/
+*.pyc
+*.key
+*.pem
