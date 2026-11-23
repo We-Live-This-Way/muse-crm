@@ -714,6 +714,69 @@ def main():
             check("recordCall shift_campaign invalid name %r (400)" % bad_name,
                   code == 400, bad_name_res)
 
+        # v1.8: listLeads ordering is deterministic under updated_at
+        # ties. updated_at is second-precision and bulk imports share
+        # timestamps, so without an id tiebreak tied rows can come back
+        # in a different order on every page fetch and offset paging
+        # can recycle or skip rows. The tiebreak alone does NOT fix
+        # the skip when a row leaves the filtered set mid-pass (the
+        # dialer must count only still-matching leads in its offset);
+        # it only guarantees identical data pages identically.
+        code, imp_tie = v1.jreq("POST", "/api/v1/importLeadsCsv",
+                                {"csv": "name,phone\n"
+                                        "Tie One,9545550301\n"
+                                        "Tie Two,9545550302\n"
+                                        "Tie Three,9545550303\n"
+                                        "Tie Four,9545550304\n"
+                                        "Tie Five,9545550305\n",
+                                 "importedBy": "mybot"},
+                                headers={"Authorization": "Bearer " + api_key})
+        check("bot API import leads for tiebreak tests",
+              code == 200 and imp_tie.get("imported") == 5, imp_tie)
+        import sqlite3 as _sqlite3
+        _conn = _sqlite3.connect(db_path)
+        _conn.execute("UPDATE leads SET updated_at='2026-11-22T00:00:00Z' "
+                      "WHERE phone IN ('9545550301','9545550302','9545550303',"
+                      "'9545550304','9545550305')")
+        _conn.commit()
+        tie_ids = [r[0] for r in _conn.execute(
+            "SELECT id FROM leads WHERE phone IN ('9545550301','9545550302',"
+            "'9545550303','9545550304','9545550305') ORDER BY id").fetchall()]
+        _conn.close()
+        code, tie_list = v1.jreq(
+            "GET", "/api/v1/listLeads?campaign=delivery&status=new&limit=500",
+            headers={"Authorization": "Bearer " + api_key})
+        tie_order = [l["id"] for l in tie_list["leads"]
+                     if l["id"] in set(tie_ids)]
+        check("listLeads breaks updated_at ties by id DESC",
+              code == 200 and tie_order == sorted(tie_ids, reverse=True),
+              tie_order)
+        # paging across the whole delivery+new set with limit=2: every
+        # row exactly once, pages concatenated == one full fetch
+        code, full = v1.jreq(
+            "GET", "/api/v1/listLeads?campaign=delivery&status=new&limit=500",
+            headers={"Authorization": "Bearer " + api_key})
+        full_ids = [l["id"] for l in full["leads"]]
+        paged_ids = []
+        offset = 0
+        ok_pages = True
+        while True:
+            code, pg = v1.jreq(
+                "GET",
+                "/api/v1/listLeads?campaign=delivery&status=new&limit=2&offset=%d"
+                % offset,
+                headers={"Authorization": "Bearer " + api_key})
+            if code != 200:
+                ok_pages = False
+                break
+            paged_ids.extend(l["id"] for l in pg["leads"])
+            if len(pg["leads"]) < 2:
+                break
+            offset += 2
+        check("listLeads offset paging under ties: no dupes, no skips, same order as full fetch",
+              ok_pages and paged_ids == full_ids,
+              (len(paged_ids), len(full_ids)))
+
         # migration: an old-schema DB without the website column gains it
         # on init_schema, and an import then stores a website
         mig_db = os.path.join(tmp, "old.db")
