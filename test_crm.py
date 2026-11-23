@@ -777,6 +777,68 @@ def main():
               ok_pages and paged_ids == full_ids,
               (len(paged_ids), len(full_ids)))
 
+
+        # address field + updateLead (Muse upgrades)
+        code, with_addr = c.jreq("POST", "/api/leads", {
+            "name": "Pat Lee", "business": "Lee Plumbing",
+            "phone": "9545550199", "address": "100 Main St",
+            "city": "Miami", "campaign": "delivery"})
+        check("create lead with address",
+              code == 201 and with_addr["lead"].get("address") == "100 Main St",
+              with_addr)
+        addr_id = with_addr["lead"]["id"]
+        code, lst_addr = v1.jreq(
+            "GET", "/api/v1/listLeads?q=100%20Main%20St",
+            headers={"Authorization": "Bearer " + api_key})
+        check("listLeads search finds address",
+              code == 200 and any(l["id"] == addr_id for l in lst_addr.get("leads", [])),
+              lst_addr)
+        code, upd = v1.jreq(
+            "POST", "/api/v1/updateLead",
+            {"lead_id": addr_id, "business": "Lee Plumbing Co",
+             "name": "Patricia Lee", "address": "200 Oak Ave"},
+            headers={"Authorization": "Bearer " + api_key})
+        check("updateLead changes business, name and address",
+              code == 200
+              and upd["lead"]["business"] == "Lee Plumbing Co"
+              and upd["lead"]["name"] == "Patricia Lee"
+              and upd["lead"]["address"] == "200 Oak Ave",
+              upd)
+        code, partial = v1.jreq(
+            "POST", "/api/v1/updateLead",
+            {"lead_id": addr_id, "address": "300 Pine Rd"},
+            headers={"Authorization": "Bearer " + api_key})
+        check("updateLead changes only fields present",
+              code == 200
+              and partial["lead"]["address"] == "300 Pine Rd"
+              and partial["lead"]["business"] == "Lee Plumbing Co",
+              partial)
+        code, bad_upd = v1.jreq(
+            "POST", "/api/v1/updateLead",
+            {"lead_id": addr_id},
+            headers={"Authorization": "Bearer " + api_key})
+        check("updateLead without fields returns 400", code == 400, bad_upd)
+        code, missing = v1.jreq(
+            "POST", "/api/v1/updateLead",
+            {"lead_id": 99999999, "name": "Nobody"},
+            headers={"Authorization": "Bearer " + api_key})
+        check("updateLead missing lead returns 404", code == 404, missing)
+        code, csv_addr = v1.jreq(
+            "POST", "/api/v1/importLeadsCsv",
+            {"csv": "name,business,phone,address,city\nSam Diaz,Diaz HVAC,9545550188,12 Coral Way,Hialeah\n",
+             "importedBy": "mybot"},
+            headers={"Authorization": "Bearer " + api_key})
+        check("importLeadsCsv stores address",
+              code == 200 and csv_addr.get("imported") == 1, csv_addr)
+        code, found = v1.jreq(
+            "GET", "/api/v1/listLeads?q=12%20Coral%20Way",
+            headers={"Authorization": "Bearer " + api_key})
+        check("imported address is searchable",
+              code == 200 and any(
+                  l.get("address") == "12 Coral Way" and l.get("phone") == "9545550188"
+                  for l in found.get("leads", [])),
+              found)
+
         # migration: an old-schema DB without the website column gains it
         # on init_schema, and an import then stores a website
         mig_db = os.path.join(tmp, "old.db")

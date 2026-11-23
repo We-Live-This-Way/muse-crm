@@ -8,9 +8,9 @@ A small self-hosted CRM for text-message lead outreach. One Python file, one SQL
 
 - **Pipeline board:** New → Texted → Replied → Taken over → Closed / Not qualified / Do not contact.
 - **One inbox** for inbound replies, with STOP handling (auto opt-out) and human takeover, which blocks automated sends.
-- **CSV import** with flexible headers and dedupe by phone; campaigns; templates with `{name}`, `{business}` and `{city}`; bulk sends; call dispositions; a daily send cap (default 100); notifications.
+- **CSV import** with flexible headers and dedupe by phone; an **address** field on each lead (CSV, web UI, search, and manual add); campaigns; templates with `{name}`, `{business}` and `{city}`; bulk sends; call dispositions; a daily send cap (default 100); notifications.
 - **Texting providers:** Twilio and VoIP.ms, set up in the web UI under Settings. With no provider configured, sends are recorded as *queued* and never faked as sent.
-- **Bot API** with per-bot keys (`Authorization: Bearer <key>`): import leads, list leads, send texts, read the inbox, record calls. Every call is logged.
+- **Bot API** with per-bot keys (`Authorization: Bearer <key>`): import leads, list leads, update a lead's business / contact name / address (`POST /api/v1/updateLead`), send texts, read the inbox, record calls. Every call is logged.
 - **Webhooks:** `POST /webhooks/twilio` (with signature validation) and `POST /webhooks/voipms`.
 - `attention.py`: a read-only daily digest of replies waiting, leads gone quiet and leads never texted.
 

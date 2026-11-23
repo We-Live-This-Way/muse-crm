@@ -143,6 +143,7 @@ the hub or chat). Bots call the CRM with
 
 - `POST /api/v1/importLeadsCsv` — `{"csv": "...", "importedBy": "mybot"}`
 - `GET  /api/v1/listLeads?status=new`
+- `POST /api/v1/updateLead` — `{"lead_id": 12, "business": "...", "name": "...", "address": "..."}` (only fields you send are changed; `phone` can identify the lead instead of `lead_id`)
 - `POST /api/v1/sendSms` — `{"lead_id": 12, "template_id": 3}` or `{"phone": "...", "body": "..."}`
 - `GET  /api/v1/listInbox` — optional `?lead_id=12` for one thread
 - `POST /api/v1/recordInboundReply` — `{"phone": "...", "body": "..."}`
